@@ -1,16 +1,17 @@
 ﻿
-module FileCrawler
+module FileVersions.FileCrawler
 
 open System
 open System.IO
 
-let internal dirInfoFilter (dirInfo: DirectoryInfo) =
-    (not (dirInfo.Name.StartsWith("."))) &&
-        (not (dirInfo.Attributes.HasFlag(FileAttributes.Hidden) ||
-             dirInfo.Attributes.HasFlag(FileAttributes.System) ||
-             dirInfo.Attributes.HasFlag(FileAttributes.ReadOnly)))    
-
 let internal crawlDirectories rootDirectory =
+
+    let dirInfoFilter (dirInfo: DirectoryInfo) =
+        (not (dirInfo.Name.StartsWith("."))) &&
+            (not (dirInfo.Attributes.HasFlag(FileAttributes.Hidden) ||
+                dirInfo.Attributes.HasFlag(FileAttributes.System) ||
+                dirInfo.Attributes.HasFlag(FileAttributes.ReadOnly)))
+
     let rec crawlSubDirectories results unprocessed =
         let directory = List.head unprocessed
         let restOfUnprocessed = List.tail unprocessed
@@ -28,10 +29,18 @@ let internal crawlDirectories rootDirectory =
             crawlSubDirectories newResults (restOfUnprocessed @ subDirectories)
 
     crawlSubDirectories List.Empty (rootDirectory :: [])
+        |> List.map (fun (path: string) ->
+            if path.StartsWith(rootDirectory, StringComparison.InvariantCultureIgnoreCase) then
+                path.Replace(rootDirectory, @".")
+            else
+                path)
         |> List.rev
+
+open Hasher
 
 let internal crawlFiles directoryPath =
     let files =
         Directory.EnumerateFiles(directoryPath, "*", SearchOption.TopDirectoryOnly)
         |> Seq.sortBy (fun item -> item.ToLowerInvariant())
+        |> Seq.map (fun path -> (path, calculateHash path))
     files
